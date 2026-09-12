@@ -12,11 +12,12 @@ Transform your existing garage door sensors and switches into intelligent garage
 ### Requirements:
 - Binary sensor for detecting door open state
 - Binary sensor for detecting door closed state  
-- Switch entity to control garage door opener
-- Home Assistant 2023.8.0 or newer
+- Switch or light entity to control garage door opener
+- Home Assistant 2025.8.0 or newer
 
 ### Configuration:
-Simply add your garage doors to `configuration.yaml` with their sensor and switch entity IDs.
+Add each garage door through **Settings → Devices & Services → Add Integration**, picking your
+sensor and toggle entities. Reconfigure or tune it later from the same integration entry.
 
 ### Perfect for:
 - DIY garage door automation setups

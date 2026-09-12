@@ -29,7 +29,7 @@ TOGGLE_DOMAINS = ["switch", "light"]
 
 # Configuration flow steps
 STEP_USER = "user"
-STEP_GARAGE = "garage"
+STEP_RECONFIGURE = "reconfigure"
 
 # Default sensor debounce in milliseconds
 DEFAULT_SENSOR_DEBOUNCE_MS = 300 

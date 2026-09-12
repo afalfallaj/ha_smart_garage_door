@@ -9,8 +9,7 @@ A Home Assistant custom component that creates smart garage door entities from b
 - **Template Sensors**: Creates intelligent sensors that track garage door state
 - **Template Covers**: Provides proper garage door cover entities with open/close/stop functionality
 - **Switch & Light Support**: Works with both switch and light entities (perfect for Shelly devices)
-- **UI Configuration**: Easy setup through Home Assistant's user interface
-- **YAML Configuration**: Also supports traditional YAML configuration
+- **UI Configuration**: Setup, reconfiguration, and options all through Home Assistant's interface
 - **Safety Logic**: Only allows operations when the garage door is in the correct state
 - **HACS Compatible**: Easy installation through Home Assistant Community Store
 
@@ -32,6 +31,11 @@ A Home Assistant custom component that creates smart garage door entities from b
 1. Copy the `custom_components/smart_garage` folder to your Home Assistant `custom_components` directory
 2. Restart Home Assistant
 
+> **Note**: `custom_components/smart_garage/brand/` ships icon/logo images built from the
+> open-source `mdi:garage` glyph ([Material Design Icons](https://github.com/Pictogrammers/MaterialDesign),
+> Apache 2.0 — see `brand/SOURCE.md`) so HACS/HA don't fall back to a generic icon. Swap them for
+> dedicated artwork whenever you want a custom logo instead of the stock icon.
+
 ## Configuration
 
 ### UI Configuration (Recommended)
@@ -49,34 +53,13 @@ A Home Assistant custom component that creates smart garage door entities from b
 
 Repeat this process for each garage door you want to add.
 
-### YAML Configuration
+### Reconfiguring or tuning a garage door later
 
-Add the following to your `configuration.yaml` file:
-
-```yaml
-smart_garage:
-  garages:
-    # Using a switch entity (traditional)
-    - name: "Main Garage"
-      open_sensor: binary_sensor.main_garage_open
-      closed_sensor: binary_sensor.main_garage_closed
-      toggle_entity: switch.main_garage_opener
-      motion_duration: 35  # Optional, defaults to 35 seconds
-
-    # Using a light entity (common with Shelly devices)
-    - name: "Side Garage"
-      open_sensor: binary_sensor.side_garage_open_sensor
-      closed_sensor: binary_sensor.side_garage_closed_sensor
-      toggle_entity: light.shelly_side_garage_relay
-      motion_duration: 45  # Takes 45 seconds to open/close
-
-    # Shelly device example
-    - name: "Basement Garage"
-      open_sensor: binary_sensor.shelly_door_sensor_1_input
-      closed_sensor: binary_sensor.shelly_door_sensor_2_input  
-      toggle_entity: light.shelly_1_channel_1  # Shelly relay exposed as light
-      motion_duration: 40
-```
+- **Wrong sensor/toggle entity, or renaming**: open the integration entry and choose
+  **Reconfigure** to change the name, open sensor, closed sensor, or toggle entity without
+  removing and re-adding the garage door.
+- **Motion duration / sensor debounce**: open the integration entry and choose **Configure** to
+  edit these as options at any time; the integration reloads automatically when you save.
 
 ### Configuration Variables
 
@@ -86,7 +69,14 @@ smart_garage:
 | `open_sensor` | Yes | - | Entity ID of the binary sensor that detects when the door is fully open |
 | `closed_sensor` | Yes | - | Entity ID of the binary sensor that detects when the door is fully closed |
 | `toggle_entity` | Yes | - | Entity ID of the switch or light that controls the garage door opener |
-| `motion_duration` | No | 35 | Time in seconds to consider the door as "opening" or "closing" after toggle |
+| `motion_duration` (option) | No | 35s | Time in seconds to consider the door as "opening" or "closing" after toggle |
+| `sensor_debounce_ms` (option) | No | 300ms | How long to wait after a sensor changes before recomputing state, to smooth out sensor flicker |
+
+> **Migrating from v1.x YAML configuration**: YAML setup (`smart_garage:` in
+> `configuration.yaml`) was removed in v2.0.0 — it relied on a Home Assistant API removed in
+> HA 2024.11, so it no longer worked anyway. Remove the `smart_garage:` block from your
+> `configuration.yaml` and re-add each garage door through **Settings → Devices & Services →
+> Add Integration** instead; your existing sensors/switch are unaffected.
 
 ### Supported Toggle Entities
 
@@ -209,17 +199,9 @@ entities:
 
 ## Shelly Device Integration
 
-This integration works perfectly with Shelly devices:
-
-```yaml
-smart_garage:
-  garages:
-    - name: "Main Garage"
-      open_sensor: binary_sensor.shelly_door_sensor_open
-      closed_sensor: binary_sensor.shelly_door_sensor_closed
-      toggle_entity: light.shelly_1_channel_1  # Shelly relay as light
-      motion_duration: 35
-```
+This integration works perfectly with Shelly devices: when adding a garage door through the UI,
+pick your Shelly door sensors as the open/closed sensors, and the Shelly relay's `light.*` entity
+as the toggle entity.
 
 ## Safety Features
 
@@ -247,41 +229,47 @@ After adding this, restart Home Assistant and check the logs at **Settings** →
 
 ### Debug Log Analysis
 
-When covers show as "unavailable", look for these key log messages:
+When covers show as "unavailable", look for these key log messages (all from
+`custom_components.smart_garage.garage`, since one tracker per garage door owns state derivation
+for both its sensor and cover entities):
 
 1. **Integration Setup**:
    ```
    Setting up Smart Garage from config entry: [Garage Name]
    ```
 
-2. **Sensor Creation**:
+2. **Missing entities**:
    ```
-   Created sensor entity with unique_id: smart_garage_[name]_state
+   Garage '[Garage Name]': waiting on entities open=False closed=True toggle=True
+   ```
+   (`open=False` here means the open sensor entity itself doesn't exist yet/anymore)
+
+3. **Motion tracking**:
+   ```
+   Motion started for '[Garage Name]': previous_state=open
    ```
 
-3. **Entity Validation**:
+4. **Failed transitions**:
    ```
-   Tracked entity '[entity_id]' not found! Available entities: [list]
-   ```
-
-4. **Cover Dependency**:
-   ```
-   Sensor 'sensor.smart_garage_[name]_state' not found for cover '[name]'!
+   Garage '[Garage Name]' was opening but motion expired without reaching open state
    ```
 
 ### Common Issues
 
-1. **Entities not created**: Verify entity IDs in configuration exist and are correct
-   - Check logs for "Tracked entity '[entity_id]' not found!"
+1. **Entities not created**: Verify entity IDs picked during setup still exist
+   - Check logs for "waiting on entities open=... closed=... toggle=..."
    - Verify sensors exist in **Developer Tools** → **States**
 
-2. **Cover shows "unavailable"**: Usually means the corresponding sensor isn't found
-   - Look for: "Sensor 'sensor.smart_garage_[name]_state' not found for cover"
-   - Verify the sensor entity was created successfully
+2. **Cover/sensor show "unavailable"**: Usually means one of the tracked entities is missing or
+   itself unavailable
+   - Verify all three entities (open sensor, closed sensor, toggle) exist and report a real state
+   - Use **Reconfigure** on the integration entry if you picked the wrong entity
 
-3. **State stuck on "opening"**: Check if toggle entity ID is correct and state changes are detected
-   - Look for toggle entity state changes in debug logs
-   - Verify motion_duration setting is appropriate
+3. **State stuck on "opening"/"closing"**: Check if the toggle entity ID is correct and state
+   changes are detected
+   - Look for "Motion started" / "motion expired" log lines
+   - Increase `motion_duration` via the integration's **Configure** option if your door is slower
+     than the current setting
 
 4. **Toggle not working**: Verify the toggle entity domain (switch or light) is supported
    - Check logs for "Failed to call [domain].toggle for [entity]"
@@ -298,24 +286,12 @@ When reporting issues, please include:
 3. **Debug Logs**: Relevant log entries with debug logging enabled
 4. **Home Assistant Version**: Your HA version and when the issue started
 
-### Log Example
-
-Here's what successful setup should look like in debug logs:
-
-```
-[custom_components.smart_garage] Setting up Smart Garage from config entry: Main Garage
-[custom_components.smart_garage.sensor] Created sensor entity with unique_id: smart_garage_main_garage_state
-[custom_components.smart_garage.cover] Created cover entity with unique_id: smart_garage_main_garage_cover
-[custom_components.smart_garage.sensor] Tracked entity 'binary_sensor.garage_open' found: state=off
-[custom_components.smart_garage.sensor] Initial state for sensor 'Main Garage': value=closed, available=True
-[custom_components.smart_garage.cover] Initial state for cover 'Main Garage': sensor_state=closed, available=True
-```
-
 ## Requirements
 
-- Home Assistant 2023.8.0 or newer
+- Home Assistant 2025.8.0 or newer
 - Binary sensors for garage door open/closed detection
 - Switch or light entity for garage door control
+
 
 ## Contributing
 
@@ -328,6 +304,10 @@ Here's what successful setup should look like in debug logs:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Disclaimer
+
+*USE AT YOUR OWN RISK* This project is a personal hobby project provided for experimental purposes only. Its code is written and maintained with AI assistance rather than by hand line-by-line; it's reviewed before merging, but you should still read the source and test thoroughly in your own environment before controlling real heating/cooling hardware with it.
 
 ## Support
 
