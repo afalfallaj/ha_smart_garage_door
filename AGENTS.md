@@ -37,7 +37,12 @@ Config-entry (UI) setup only — YAML configuration was removed in v2.0.0 (it de
 - `tests/` — stubs `homeassistant` via `sys.modules` (see `tests/conftest.py`) instead of pulling in
   `pytest-homeassistant-custom-component`, so tests don't need to track HA core's release cadence.
   Covers `garage.py`'s state machine and `config_flow.py`'s validation/flow steps.
-- `.github/workflows/validate.yml` — hassfest + HACS validation + `pytest` on push/PR.
+- `.github/workflows/tag_and_release.yml` — auto-tags `main`/`dev` pushes, bumps
+  `manifest.json`'s version, updates `CHANGELOG.md`, and publishes a GitHub release. Its "Commit
+  versions" step `git add`s `custom_components/*/manifest.json` and `custom_components/*/__init__.py`
+  — note the single `*/` level, matching this repo's flat `custom_components/smart_garage/` layout
+  (unlike `ha_gimdow_ble`, which this workflow was copied from, and which has an extra nesting level
+  for its BLE library code). No hassfest/HACS-validation/pytest CI currently runs on push/PR.
 - `README.md` — user-facing docs. Treat as the source of truth for documented behavior.
 
 ## Core state machine (garage.py)
