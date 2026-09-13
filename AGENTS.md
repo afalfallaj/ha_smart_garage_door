@@ -79,6 +79,18 @@ reactive views over it. If you're tempted to add polling/retry logic back for a 
 problem, it's almost certainly solvable by moving the shared logic further up into the tracker
 instead.
 
+This also merged what used to be 2 devices per garage (sensor.py and cover.py each built
+`device_info` from their own `unique_id`) into 1, keyed by `entry.entry_id` in both files. For
+garages set up before v2.0.0, the old per-entity devices become orphaned (zero entities, still
+attached to the still-loaded config entry) — HA neither auto-removes nor lets a user manually
+delete such a device by default — `async_remove_config_entry_device` (`__init__.py`) fixes that by
+unconditionally returning `True`, so any device under this entry, live or orphaned, can be deleted
+manually from Settings → Devices & Services → Devices. Deliberately not conditional: deleting
+today's live device this way is harmless, since sensor.py/cover.py just recreate it via
+`device_info` on the next reload. There's no automatic cleanup on setup — a user has to delete
+pre-v2.0.0 leftovers by hand (an earlier version of this file did that automatically via
+`_async_remove_stale_devices`; removed in favor of just relying on manual deletion).
+
 ## Recent history / trajectory
 
 Git log (pre-v2.0.0) shows heavy iteration specifically on the state-detection logic (many "improve

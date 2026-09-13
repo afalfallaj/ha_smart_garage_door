@@ -6,6 +6,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 
 from .garage import SmartGarageStateTracker
 
@@ -50,3 +51,15 @@ async def async_unload_entry(hass: HomeAssistant, entry: SmartGarageConfigEntry)
         _LOGGER.error("Failed to unload Smart Garage: %s", entry.title)
 
     return unload_ok
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, entry: SmartGarageConfigEntry, device_entry: dr.DeviceEntry
+) -> bool:
+    """Allow manually deleting any device under this entry from the UI.
+
+    sensor.py/cover.py always recreate today's device via device_info on the next
+    reload, so deleting it manually is harmless - including for pre-v2.0.0 leftover
+    devices left over from before sensor.py/cover.py shared one device.
+    """
+    return True
